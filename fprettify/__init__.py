@@ -1056,7 +1056,7 @@ def format_single_fline(f_line, whitespace, whitespace_dict, linebreak_pos,
     elif whitespace == 3:
         spacey = [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0]
     elif whitespace == 4:
-        spacey = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0]
+        spacey = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     else:
         raise NotImplementedError("unknown value for whitespace")
 
@@ -1211,7 +1211,8 @@ def add_whitespace_charwise(line, spacey, scope_parser, format_decl, filename, l
             line_ftd = line_ftd.rstrip(' ')
 
         # format string concatenation operator '//'
-        if char == '/' and line[pos:pos + 2] == "//" and (pos == 0 or line[pos - 1] != '/'):
+        if (char == '/' and line[pos:pos + 2] == "//" and (pos == 0 or line[pos - 1] != '/')
+                and level == 0 and pos > end_of_delim):
             lhs = line_ftd[:pos + offset]
             rhs = line_ftd[pos + 2 + offset:]
             line_ftd = lhs.rstrip(' ') \
@@ -1219,7 +1220,6 @@ def add_whitespace_charwise(line, spacey, scope_parser, format_decl, filename, l
                     + "//" \
                     + ' ' * spacey[10] \
                     + rhs.lstrip(' ')
-            line_ftd = line_ftd.rstrip(' ')
 
         # format '::'
         if format_decl and line[pos:pos+2] == "::":
