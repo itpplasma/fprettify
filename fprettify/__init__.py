@@ -1874,15 +1874,16 @@ def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, lle
         else:
             label_use = ''
 
+        padding = ind_use - 3 * is_omp_conditional - len(label_use) + \
+            len(line) - len(line.lstrip(' '))
+        padding = max(0, padding)
+
         if ind_use + line_length <= (llength+1):  # llength (default 132) plus 1 newline char
             outfile.write('!$ ' * is_omp_conditional + label_use +
-                          ' ' * (ind_use - 3 * is_omp_conditional - len(label_use) +
-                                 len(line) - len(line.lstrip(' '))) +
-                          line.lstrip(' '))
+                          ' ' * padding + line.lstrip(' '))
         elif line_length <= (llength+1):
-            outfile.write('!$ ' * is_omp_conditional + label_use + ' ' *
-                          ((llength+1) - 3 * is_omp_conditional - len(label_use) -
-                           len(line.lstrip(' '))) + line.lstrip(' '))
+            outfile.write('!$ ' * is_omp_conditional + label_use +
+                          ' ' * padding + line.lstrip(' '))
 
             log_message(LINESPLIT_MESSAGE+" (limit: "+str(llength)+")", "warning",
                         filename, line_nr)

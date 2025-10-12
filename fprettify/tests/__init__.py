@@ -219,6 +219,75 @@ class FPrettifyTestCase(unittest.TestCase):
         self.assert_fprettify_result(['--disable-indent'], instring, outstring_exp_noindent)
         self.assert_fprettify_result(['--disable-indent', '--disable-whitespace'], instring, instring)
 
+
+    def test_indent_preserves_line_length_limit(self):
+        """indentation should remain stable when exceeding line length"""
+        in_lines = [
+            'subroutine demo(tokens, stmt_start)',
+            '   type(dummy), intent(in) :: tokens(:)',
+            '   integer, intent(in) :: stmt_start',
+            '   integer :: i, nesting_level',
+            '',
+            '   if (tokens(stmt_start)%text == "if") then',
+            '      if (tokens(i)%text == "endif") then',
+            '         nesting_level = nesting_level - 1',
+            '      else if (tokens(i)%text == "end" .and. i + 1 <= size(tokens) .and. &',
+            '               tokens(i + 1)%kind == TK_KEYWORD .and. tokens(i + 1)%text == "if") then',
+            '         nesting_level = nesting_level - 1',
+            '      end if',
+            '   end if',
+            '',
+            '   if (tokens(i)%text == "end") then',
+            '      if (i + 1 <= size(tokens) .and. tokens(i + 1)%kind == TK_KEYWORD) then',
+            '         if (tokens(i + 1)%text == "do" .and. tokens(stmt_start)%text == "do") then',
+            '            nesting_level = nesting_level - 1',
+            '         else if (tokens(i + 1)%text == "select" .and. tokens(stmt_start)%text == "select") then',
+            '            nesting_level = nesting_level - 1',
+            '         else if (tokens(i + 1)%text == "where" .and. tokens(stmt_start)%text == "where") then',
+            '            nesting_level = nesting_level - 1',
+            '         end if',
+            '      end if',
+            '   end if',
+            'end subroutine demo',
+            ''
+        ]
+
+        out_lines = [
+            'subroutine demo(tokens, stmt_start)',
+            '   type(dummy), intent(in) :: tokens(:)',
+            '   integer, intent(in) :: stmt_start',
+            '   integer :: i, nesting_level',
+            '',
+            '   if (tokens(stmt_start)%text == "if") then',
+            '      if (tokens(i)%text == "endif") then',
+            '         nesting_level = nesting_level - 1',
+            '      else if (tokens(i)%text == "end" .and. i + 1 <= size(tokens) .and. &',
+            '               tokens(i + 1)%kind == TK_KEYWORD .and. tokens(i + 1)%text == "if") then',
+            '         nesting_level = nesting_level - 1',
+            '      end if',
+            '   end if',
+            '',
+            '   if (tokens(i)%text == "end") then',
+            '      if (i + 1 <= size(tokens) .and. tokens(i + 1)%kind == TK_KEYWORD) then',
+            '         if (tokens(i + 1)%text == "do" .and. tokens(stmt_start)%text == "do") then',
+            '            nesting_level = nesting_level - 1',
+            '         else if (tokens(i + 1)%text == "select" .and. tokens(stmt_start)%text == "select") then',
+            '            nesting_level = nesting_level - 1',
+            '         else if (tokens(i + 1)%text == "where" .and. tokens(stmt_start)%text == "where") then',
+            '            nesting_level = nesting_level - 1',
+            '         end if',
+            '      end if',
+            '   end if',
+            'end subroutine demo',
+            ''
+        ]
+
+        instring = '\n'.join(in_lines)
+        outstring_exp = '\n'.join(out_lines)
+
+        self.assert_fprettify_result(['-l', '90'], instring, outstring_exp)
+
+
     def test_comments(self):
         """test options related to comments"""
         instring = ("TYPE mytype\n!  c1\n  !c2\n   INTEGER :: a   !  c3\n"
