@@ -109,6 +109,9 @@ For more options, read
 fprettify -h
 ```
 
+Notable toggles include `--whitespace-concat`, which controls whether the
+string concatenation operator `//` is surrounded by spaces when formatting.
+
 When cleaning up inline comments, `--strip-comments` removes superfluous whitespace in front of comment markers. Combine it with `--comment-spacing N` to specify how many spaces should remain between code and the trailing comment (default: 1).
 
 ## Editor integration
