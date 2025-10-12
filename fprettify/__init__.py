@@ -1882,8 +1882,11 @@ def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, lle
             outfile.write('!$ ' * is_omp_conditional + label_use +
                           ' ' * padding + line.lstrip(' '))
         elif line_length <= (llength+1):
+            # Recompute padding to right-align at the line length limit
+            padding_overflow = (llength + 1) - 3 * is_omp_conditional - len(label_use) - len(line.lstrip(' '))
+            padding_overflow = max(0, padding_overflow)
             outfile.write('!$ ' * is_omp_conditional + label_use +
-                          ' ' * padding + line.lstrip(' '))
+                          ' ' * padding_overflow + line.lstrip(' '))
 
             log_message(LINESPLIT_MESSAGE+" (limit: "+str(llength)+")", "warning",
                         filename, line_nr)
