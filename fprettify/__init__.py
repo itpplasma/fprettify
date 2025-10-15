@@ -1608,7 +1608,7 @@ def reformat_ffile_combined(infile, outfile, impose_indent=True, indent_size=3, 
             if indent[0] < len(label):
                 indent = [ind + len(label) - indent[0] for ind in indent]
 
-        write_formatted_line(outfile, indent, lines, orig_lines, indent_special, llength,
+        write_formatted_line(outfile, indent, lines, orig_lines, indent_special, indent_size, llength,
                              use_same_line, is_omp_conditional, label, orig_filename, stream.line_nr)
 
         do_indent, use_same_line = pass_defaults_to_next_line(f_line)
@@ -1846,10 +1846,99 @@ def get_manual_alignment(lines):
     return manual_lines_indent
 
 
-def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, llength, use_same_line, is_omp_conditional, label, filename, line_nr):
+def _find_split_position(text, max_width):
+    """
+    Locate a suitable breakpoint (prefer whitespace or comma) within max_width.
+    Returns None if no such breakpoint exists.
+    """
+    if max_width < 1:
+        return None
+    search_limit = min(len(text), max_width)
+    candidate = text.rfind(' ', 0, search_limit + 1)
+    # ensure remainder is not too short; otherwise backtrack
+    while candidate > 0 and (len(text) - candidate) < 12:
+        candidate = text.rfind(' ', 0, candidate)
+    if candidate > 0:
+        return candidate
+
+    candidate = text.rfind(',', 0, search_limit + 1)
+    if candidate != -1 and (len(text) - candidate) > 4:
+        return candidate + 1
+
+    return None
+
+
+def _auto_split_line(line, ind_use, llength, indent_size):
+    """
+    Attempt to split a long logical line into continuation lines that
+    respect the configured line-length limit. Returns a list of new line
+    fragments when successful, otherwise None.
+    """
+    stripped = line.lstrip(' ')
+    if not stripped:
+        return None
+    if stripped.startswith('&'):
+        return None
+    line_has_newline = stripped.endswith('\n')
+    if line_has_newline:
+        stripped = stripped[:-1]
+
+    max_first = llength - ind_use - 2  # reserve for trailing ampersand
+    if max_first <= 0:
+        return None
+
+    break_pos = _find_split_position(stripped, max_first)
+    if break_pos is None or break_pos >= len(stripped):
+        return None
+
+    remainder = stripped[break_pos:].lstrip()
+    if not remainder:
+        return None
+
+    first_chunk = stripped[:break_pos].rstrip()
+    new_lines = [first_chunk + ' &']
+
+    current_indent = ind_use + indent_size
+    current = remainder
+
+    while current:
+        available = llength - current_indent
+        if available <= 0:
+            return None
+
+        # final chunk (fits without ampersand)
+        if len(current) + 2 <= available:
+            new_lines.append('& ' + current)
+            break
+
+        split_limit = available - 2  # account for ' &' suffix
+        if split_limit <= 0:
+            return None
+
+        cont_break = _find_split_position(current, split_limit)
+        if cont_break is None or cont_break >= len(current):
+            return None
+
+        chunk = current[:cont_break].rstrip()
+        if not chunk:
+            return None
+        new_lines.append('& ' + chunk + ' &')
+        current = current[cont_break:].lstrip()
+
+    if line_has_newline:
+        new_lines = [chunk.rstrip('\n') + '\n' for chunk in new_lines]
+
+    return new_lines
+
+
+def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, indent_size, llength, use_same_line, is_omp_conditional, label, filename, line_nr):
     """Write reformatted line to file"""
 
-    for ind, line, orig_line in zip(indent, lines, orig_lines):
+    idx = 0
+    while idx < len(lines):
+        ind = indent[idx]
+        line = lines[idx]
+        orig_line = orig_lines[idx]
 
         # get actual line length excluding comment:
         line_length = 0
@@ -1878,6 +1967,23 @@ def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, lle
             len(line) - len(line.lstrip(' '))
         padding = max(0, padding)
 
+        if ind_use + line_length > (llength + 1):
+            split_lines = None
+            if line_length <= (llength + 1):
+                split_lines = _auto_split_line(line, ind_use, llength, indent_size)
+            if split_lines:
+                base_indent = indent[idx]
+                indent.pop(idx)
+                lines.pop(idx)
+                orig_lines.pop(idx)
+                follow_indent = base_indent + indent_size
+                new_indents = [base_indent] + [follow_indent] * (len(split_lines) - 1)
+                for new_line, new_indent in reversed(list(zip(split_lines, new_indents))):
+                    lines.insert(idx, new_line)
+                    indent.insert(idx, new_indent)
+                    orig_lines.insert(idx, new_line)
+                continue
+
         if ind_use + line_length <= (llength+1):  # llength (default 132) plus 1 newline char
             outfile.write('!$ ' * is_omp_conditional + label_use +
                           ' ' * padding + line.lstrip(' '))
@@ -1894,6 +2000,11 @@ def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, lle
             outfile.write(orig_line)
             log_message(LINESPLIT_MESSAGE+" (limit: "+str(llength)+")", "warning",
                         filename, line_nr)
+
+        if label:
+            label = ''
+
+        idx += 1
 
 
 def get_curr_delim(line, pos):
