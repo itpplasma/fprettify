@@ -271,9 +271,11 @@ class FPrettifyTestCase(unittest.TestCase):
             '      if (i + 1 <= size(tokens) .and. tokens(i + 1)%kind == TK_KEYWORD) then',
             '         if (tokens(i + 1)%text == "do" .and. tokens(stmt_start)%text == "do") then',
             '            nesting_level = nesting_level - 1',
-            '   else if (tokens(i + 1)%text == "select" .and. tokens(stmt_start)%text == "select") then',
+            '         else if (tokens(i + 1)%text == "select" .and. tokens(stmt_start)%text == &',
+            '            & "select") then',
             '            nesting_level = nesting_level - 1',
-            '     else if (tokens(i + 1)%text == "where" .and. tokens(stmt_start)%text == "where") then',
+            '         else if (tokens(i + 1)%text == "where" .and. tokens(stmt_start)%text == &',
+            '            & "where") then',
             '            nesting_level = nesting_level - 1',
             '         end if',
             '      end if',
@@ -286,6 +288,25 @@ class FPrettifyTestCase(unittest.TestCase):
         outstring_exp = '\n'.join(out_lines)
 
         self.assert_fprettify_result(['-l', '90'], instring, outstring_exp)
+
+    def test_auto_split_long_logical_line(self):
+        """automatically split long logical lines that exceed the limit after indentation"""
+        instring = (
+            "subroutine demo()\n"
+            "    integer :: a\n"
+            "    if (this_condition_is_lengthy .or. second_lengthy_condition) cycle\n"
+            "end subroutine demo"
+        )
+
+        outstring_exp = (
+            "subroutine demo()\n"
+            "    integer :: a\n"
+            "    if (this_condition_is_lengthy .or. &\n"
+            "        & second_lengthy_condition) cycle\n"
+            "end subroutine demo"
+        )
+
+        self.assert_fprettify_result(['-i', '4', '-l', '68'], instring, outstring_exp)
 
 
     def test_comments(self):
