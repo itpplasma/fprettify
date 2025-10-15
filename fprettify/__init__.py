@@ -1609,7 +1609,8 @@ def reformat_ffile_combined(infile, outfile, impose_indent=True, indent_size=3, 
                 indent = [ind + len(label) - indent[0] for ind in indent]
 
         write_formatted_line(outfile, indent, lines, orig_lines, indent_special, indent_size, llength,
-                             use_same_line, is_omp_conditional, label, orig_filename, stream.line_nr)
+                             use_same_line, is_omp_conditional, label, orig_filename, stream.line_nr,
+                             allow_split=impose_whitespace and auto_format)
 
         do_indent, use_same_line = pass_defaults_to_next_line(f_line)
 
@@ -1853,17 +1854,28 @@ def _find_split_position(text, max_width):
     """
     if max_width < 1:
         return None
-    search_limit = min(len(text), max_width)
-    candidate = text.rfind(' ', 0, search_limit + 1)
-    # ensure remainder is not too short; otherwise backtrack
-    while candidate > 0 and (len(text) - candidate) < 12:
-        candidate = text.rfind(' ', 0, candidate)
-    if candidate > 0:
-        return candidate
+    search_limit = min(len(text) - 1, max_width)
+    if search_limit < 0:
+        return None
 
-    candidate = text.rfind(',', 0, search_limit + 1)
-    if candidate != -1 and (len(text) - candidate) > 4:
-        return candidate + 1
+    spaces = []
+    commas = []
+
+    for pos, char in CharFilter(text):
+        if pos > search_limit:
+            break
+        if char == ' ':
+            spaces.append(pos)
+        elif char == ',':
+            commas.append(pos)
+
+    for candidate in reversed(spaces):
+        if len(text) - candidate >= 12:
+            return candidate
+
+    for candidate in reversed(commas):
+        if len(text) - candidate > 4:
+            return candidate + 1
 
     return None
 
@@ -1874,6 +1886,9 @@ def _auto_split_line(line, ind_use, llength, indent_size):
     respect the configured line-length limit. Returns a list of new line
     fragments when successful, otherwise None.
     """
+    if llength < 40:
+        return None
+
     stripped = line.lstrip(' ')
     if not stripped:
         return None
@@ -1882,6 +1897,9 @@ def _auto_split_line(line, ind_use, llength, indent_size):
     line_has_newline = stripped.endswith('\n')
     if line_has_newline:
         stripped = stripped[:-1]
+
+    if '!' in stripped:
+        return None
 
     max_first = llength - ind_use - 2  # reserve for trailing ampersand
     if max_first <= 0:
@@ -1931,7 +1949,7 @@ def _auto_split_line(line, ind_use, llength, indent_size):
     return new_lines
 
 
-def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, indent_size, llength, use_same_line, is_omp_conditional, label, filename, line_nr):
+def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, indent_size, llength, use_same_line, is_omp_conditional, label, filename, line_nr, allow_split):
     """Write reformatted line to file"""
 
     idx = 0
@@ -1967,10 +1985,8 @@ def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, ind
             len(line) - len(line.lstrip(' '))
         padding = max(0, padding)
 
-        if ind_use + line_length > (llength + 1):
-            split_lines = None
-            if line_length <= (llength + 1):
-                split_lines = _auto_split_line(line, ind_use, llength, indent_size)
+        if allow_split and ind_use + line_length > (llength + 1):
+            split_lines = _auto_split_line(line, ind_use, llength, indent_size)
             if split_lines:
                 base_indent = indent[idx]
                 indent.pop(idx)
