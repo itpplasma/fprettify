@@ -219,6 +219,115 @@ class FPrettifyTestCase(unittest.TestCase):
         self.assert_fprettify_result(['--disable-indent'], instring, outstring_exp_noindent)
         self.assert_fprettify_result(['--disable-indent', '--disable-whitespace'], instring, instring)
 
+
+    def test_indent_preserves_line_length_limit(self):
+        """indentation should remain stable when exceeding line length"""
+        in_lines = [
+            'subroutine demo(tokens, stmt_start)',
+            '   type(dummy), intent(in) :: tokens(:)',
+            '   integer, intent(in) :: stmt_start',
+            '   integer :: i, nesting_level',
+            '',
+            '   if (tokens(stmt_start)%text == "if") then',
+            '      if (tokens(i)%text == "endif") then',
+            '         nesting_level = nesting_level - 1',
+            '      else if (tokens(i)%text == "end" .and. i + 1 <= size(tokens) .and. &',
+            '               tokens(i + 1)%kind == TK_KEYWORD .and. tokens(i + 1)%text == "if") then',
+            '         nesting_level = nesting_level - 1',
+            '      end if',
+            '   end if',
+            '',
+            '   if (tokens(i)%text == "end") then',
+            '      if (i + 1 <= size(tokens) .and. tokens(i + 1)%kind == TK_KEYWORD) then',
+            '         if (tokens(i + 1)%text == "do" .and. tokens(stmt_start)%text == "do") then',
+            '            nesting_level = nesting_level - 1',
+            '         else if (tokens(i + 1)%text == "select" .and. tokens(stmt_start)%text == "select") then',
+            '            nesting_level = nesting_level - 1',
+            '         else if (tokens(i + 1)%text == "where" .and. tokens(stmt_start)%text == "where") then',
+            '            nesting_level = nesting_level - 1',
+            '         end if',
+            '      end if',
+            '   end if',
+            'end subroutine demo',
+            ''
+        ]
+
+        out_lines = [
+            'subroutine demo(tokens, stmt_start)',
+            '   type(dummy), intent(in) :: tokens(:)',
+            '   integer, intent(in) :: stmt_start',
+            '   integer :: i, nesting_level',
+            '',
+            '   if (tokens(stmt_start)%text == "if") then',
+            '      if (tokens(i)%text == "endif") then',
+            '         nesting_level = nesting_level - 1',
+            '      else if (tokens(i)%text == "end" .and. i + 1 <= size(tokens) .and. &',
+            '               tokens(i + 1)%kind == TK_KEYWORD .and. tokens(i + 1)%text == "if") then',
+            '         nesting_level = nesting_level - 1',
+            '      end if',
+            '   end if',
+            '',
+            '   if (tokens(i)%text == "end") then',
+            '      if (i + 1 <= size(tokens) .and. tokens(i + 1)%kind == TK_KEYWORD) then',
+            '         if (tokens(i + 1)%text == "do" .and. tokens(stmt_start)%text == "do") then',
+            '            nesting_level = nesting_level - 1',
+            '         else if (tokens(i + 1)%text == "select" .and. tokens(stmt_start)%text == &',
+            '                  "select") then',
+            '            nesting_level = nesting_level - 1',
+            '         else if (tokens(i + 1)%text == "where" .and. tokens(stmt_start)%text == &',
+            '                  "where") then',
+            '            nesting_level = nesting_level - 1',
+            '         end if',
+            '      end if',
+            '   end if',
+            'end subroutine demo',
+            ''
+        ]
+
+        instring = '\n'.join(in_lines)
+        outstring_exp = '\n'.join(out_lines)
+
+        self.assert_fprettify_result(['-l', '90'], instring, outstring_exp)
+
+    def test_auto_split_long_logical_line(self):
+        """automatically split long logical lines that exceed the limit after indentation"""
+        instring = (
+            "subroutine demo()\n"
+            "    integer :: a\n"
+            "    if (this_condition_is_lengthy .or. second_lengthy_condition) cycle\n"
+            "end subroutine demo"
+        )
+
+        outstring_exp = (
+            "subroutine demo()\n"
+            "    integer :: a\n"
+            "    if (this_condition_is_lengthy .or. &\n"
+            "        second_lengthy_condition) cycle\n"
+            "end subroutine demo"
+        )
+
+        self.assert_fprettify_result(['-i', '4', '-l', '68'], instring, outstring_exp)
+
+    def test_auto_split_handles_bang_in_string(self):
+        """ensure split logic ignores exclamation marks inside string literals"""
+        instring = (
+            "subroutine demo(str)\n"
+            "    character(len=*), intent(in) :: str\n"
+            "    if (str .eq. \"This string has a ! bang inside\") print *, str//\", wow!\"\n"
+            "end subroutine demo"
+        )
+
+        outstring_exp = (
+            "subroutine demo(str)\n"
+            "    character(len=*), intent(in) :: str\n"
+            "    if (str .eq. \"This string has a ! bang inside\") print *, &\n"
+            "        str//\", wow!\"\n"
+            "end subroutine demo"
+        )
+
+        self.assert_fprettify_result(['-i', '4', '-l', '72'], instring, outstring_exp)
+
+
     def test_comments(self):
         """test options related to comments"""
         instring = ("TYPE mytype\n!  c1\n  !c2\n   INTEGER :: a   !  c3\n"
