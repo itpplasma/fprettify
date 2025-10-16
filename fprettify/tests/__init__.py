@@ -272,10 +272,10 @@ class FPrettifyTestCase(unittest.TestCase):
             '         if (tokens(i + 1)%text == "do" .and. tokens(stmt_start)%text == "do") then',
             '            nesting_level = nesting_level - 1',
             '         else if (tokens(i + 1)%text == "select" .and. tokens(stmt_start)%text == &',
-            '            & "select") then',
+            '                  "select") then',
             '            nesting_level = nesting_level - 1',
             '         else if (tokens(i + 1)%text == "where" .and. tokens(stmt_start)%text == &',
-            '            & "where") then',
+            '                  "where") then',
             '            nesting_level = nesting_level - 1',
             '         end if',
             '      end if',
@@ -302,11 +302,30 @@ class FPrettifyTestCase(unittest.TestCase):
             "subroutine demo()\n"
             "    integer :: a\n"
             "    if (this_condition_is_lengthy .or. &\n"
-            "        & second_lengthy_condition) cycle\n"
+            "        second_lengthy_condition) cycle\n"
             "end subroutine demo"
         )
 
         self.assert_fprettify_result(['-i', '4', '-l', '68'], instring, outstring_exp)
+
+    def test_auto_split_handles_bang_in_string(self):
+        """ensure split logic ignores exclamation marks inside string literals"""
+        instring = (
+            "subroutine demo(str)\n"
+            "    character(len=*), intent(in) :: str\n"
+            "    if (str .eq. \"This string has a ! bang inside\") print *, str//\", wow!\"\n"
+            "end subroutine demo"
+        )
+
+        outstring_exp = (
+            "subroutine demo(str)\n"
+            "    character(len=*), intent(in) :: str\n"
+            "    if (str .eq. \"This string has a ! bang inside\") print *, &\n"
+            "        str//\", wow!\"\n"
+            "end subroutine demo"
+        )
+
+        self.assert_fprettify_result(['-i', '4', '-l', '72'], instring, outstring_exp)
 
 
     def test_comments(self):

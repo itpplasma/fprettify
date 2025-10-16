@@ -1898,7 +1898,12 @@ def _auto_split_line(line, ind_use, llength, indent_size):
     if line_has_newline:
         stripped = stripped[:-1]
 
-    if '!' in stripped:
+    has_comment = False
+    for _, char in CharFilter(stripped, filter_comments=False):
+        if char == '!':
+            has_comment = True
+            break
+    if has_comment:
         return None
 
     max_first = llength - ind_use - 2  # reserve for trailing ampersand
@@ -1926,7 +1931,7 @@ def _auto_split_line(line, ind_use, llength, indent_size):
 
         # final chunk (fits without ampersand)
         if len(current) + 2 <= available:
-            new_lines.append('& ' + current)
+            new_lines.append(current)
             break
 
         split_limit = available - 2  # account for ' &' suffix
@@ -1940,7 +1945,7 @@ def _auto_split_line(line, ind_use, llength, indent_size):
         chunk = current[:cont_break].rstrip()
         if not chunk:
             return None
-        new_lines.append('& ' + chunk + ' &')
+        new_lines.append(chunk + ' &')
         current = current[cont_break:].lstrip()
 
     if line_has_newline:
@@ -1985,7 +1990,7 @@ def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, ind
             len(line) - len(line.lstrip(' '))
         padding = max(0, padding)
 
-        if allow_split and ind_use + line_length > (llength + 1):
+        if allow_split and ind_use + line_length >= (llength + 1):
             split_lines = _auto_split_line(line, ind_use, llength, indent_size)
             if split_lines:
                 base_indent = indent[idx]
