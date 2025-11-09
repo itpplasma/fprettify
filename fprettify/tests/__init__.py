@@ -370,8 +370,7 @@ class FPrettifyTestCase(unittest.TestCase):
             "program demo\n"
             "    if (.true.) then\n"
             "        if (.true.) then\n"
-            "            if (i > 1 .and. &\n"
-            "                identifier_that_is_far_too_long .eq. 42) &\n"
+            "            if (i > 1 .and. identifier_that_is_far_too_long .eq. 42) &\n"
             "                print *, \"oops\"\n"
             "        end if\n"
             "    end if\n"
@@ -379,6 +378,53 @@ class FPrettifyTestCase(unittest.TestCase):
         )
 
         self.assert_fprettify_result(['-i', '4', '-l', '70', '--disable-whitespace'], instring, outstring_exp)
+
+    def test_line_length_detaches_inline_comment(self):
+        """inline comments should move to their own line when they exceed the limit"""
+        instring = (
+            "program demo\n"
+            "    if (.true.) then\n"
+            "        print *, 'prefix '//'and '//'suffix' ! trailing comment\n"
+            "    end if\n"
+            "end program demo\n"
+        )
+
+        outstring_exp = (
+            "program demo\n"
+            "    if (.true.) then\n"
+            "        print *, 'prefix '//'and '//'suffix'\n"
+            "        ! trailing comment\n"
+            "    end if\n"
+            "end program demo\n"
+        )
+
+        self.assert_fprettify_result(['-i', '4', '-l', '60'], instring, outstring_exp)
+
+    def test_line_length_comment_then_split(self):
+        """detaching the comment must still allow the code line to split further"""
+        instring = (
+            "program demo\n"
+            "    if (.true.) then\n"
+            "        if (.true.) then\n"
+            "            if (foo_bar_identifier .and. bar_baz_identifier) print *, long_identifier, another_long_identifier ! note\n"
+            "        end if\n"
+            "    end if\n"
+            "end program demo\n"
+        )
+
+        outstring_exp = (
+            "program demo\n"
+            "    if (.true.) then\n"
+            "        if (.true.) then\n"
+            "            if (foo_bar_identifier .and. bar_baz_identifier) print *, &\n"
+            "                long_identifier, another_long_identifier\n"
+            "            ! note\n"
+            "        end if\n"
+            "    end if\n"
+            "end program demo\n"
+        )
+
+        self.assert_fprettify_result(['-i', '4', '-l', '72'], instring, outstring_exp)
 
 
     def test_comments(self):
@@ -537,12 +583,12 @@ class FPrettifyTestCase(unittest.TestCase):
                     "INQUIRE(14)"]
         instring_ = "if( min == max.and.min .eq. thres ) one_really_long_function_call_to_hit_the_line_limit(parameter1, parameter2,parameter3,parameter4,parameter5,err) ! this line would be too long"
         outstring = ["REAL(KIND=4) :: r, f  !  some reals",
-                     "REAL(KIND=4) :: r,f  !  some reals",
+                     "REAL(KIND=4) :: r, f\n!  some reals",
                      "if (min == max .and. min .eq. thres)",
                      "if(   min == max.and.min .eq. thres  )",
                      "INQUIRE (14)",
                      "INQUIRE (14)"]
-        outstring_ = ["if( min == max.and.min .eq. thres ) one_really_long_function_call_to_hit_the_line_limit(parameter1, parameter2,parameter3,parameter4,parameter5,err) ! this line would be too long",
+        outstring_ = ["if (min == max .and. min .eq. thres) one_really_long_function_call_to_hit_the_line_limit(parameter1, parameter2, parameter3, &\n                                                                                         parameter4, parameter5, err)\n! this line would be too long",
                       "if (min == max .and. min .eq. thres) one_really_long_function_call_to_hit_the_line_limit(parameter1, parameter2, parameter3, parameter4, parameter5, err) ! this line would be too long"]
 
         # test shorter lines first, after all the actual length doesn't matter

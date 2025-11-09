@@ -1971,6 +1971,54 @@ def _insert_split_chunks(idx, split_lines, indent, indent_size, lines, orig_line
         orig_lines.insert(idx, new_line)
 
 
+def _split_inline_comment(line):
+    """Return (code, comment) strings if line contains a detachable inline comment."""
+    if '!' not in line:
+        return None
+
+    has_newline = line.endswith('\n')
+    body = line[:-1] if has_newline else line
+
+    comment_pos = None
+    for pos, _ in CharFilter(body, filter_comments=False):
+        if body[pos] == '!':
+            comment_pos = pos
+            break
+    if comment_pos is None:
+        return None
+
+    code = body[:comment_pos].rstrip()
+    comment = body[comment_pos:].lstrip()
+
+    if not code or not comment:
+        return None
+
+    if has_newline:
+        code += '\n'
+        comment += '\n'
+
+    return code, comment
+
+
+def _detach_inline_comment(idx, indent, lines, orig_lines):
+    """Split an inline comment into its own line keeping indentation metadata."""
+    splitted = _split_inline_comment(lines[idx])
+    if not splitted:
+        return False
+
+    code_line, comment_line = splitted
+    base_indent = indent[idx]
+
+    lines[idx] = code_line
+    orig_lines[idx] = code_line
+
+    indent.insert(idx + 1, base_indent)
+    lines.insert(idx + 1, comment_line)
+    orig_lines.insert(idx + 1, comment_line)
+
+    return True
+
+
 def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, indent_size, llength, use_same_line, is_omp_conditional, label, filename, line_nr, allow_split):
     """Write reformatted line to file"""
 
@@ -2007,15 +2055,23 @@ def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, ind
             len(line) - len(line.lstrip(' '))
         padding = max(0, padding)
 
-        if allow_split and ind_use + line_length >= (llength + 1):
+        stripped_line = line.lstrip(' ')
+        rendered_length = len('!$ ' * is_omp_conditional + label_use + ' ' * padding +
+                              stripped_line.rstrip('\n'))
+
+        needs_split = allow_split and rendered_length > llength
+
+        if needs_split:
             split_lines = _auto_split_line(line, ind_use, llength, indent_size)
             if split_lines:
                 _insert_split_chunks(idx, split_lines, indent, indent_size, lines, orig_lines)
                 continue
+            if _detach_inline_comment(idx, indent, lines, orig_lines):
+                continue
 
-        if ind_use + line_length <= (llength+1):  # llength (default 132) plus 1 newline char
+        if rendered_length <= llength:
             outfile.write('!$ ' * is_omp_conditional + label_use +
-                          ' ' * padding + line.lstrip(' '))
+                          ' ' * padding + stripped_line)
         elif line_length <= (llength+1):
             # Recompute padding to right-align at the line length limit
             padding_overflow = (llength + 1) - 3 * is_omp_conditional - len(label_use) - len(line.lstrip(' '))
