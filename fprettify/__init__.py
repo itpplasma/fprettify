@@ -1955,6 +1955,22 @@ def _auto_split_line(line, ind_use, llength, indent_size):
     return new_lines
 
 
+def _insert_split_chunks(idx, split_lines, indent, indent_size, lines, orig_lines):
+    """Replace the original line at `idx` with its split chunks and matching indents."""
+    base_indent = indent[idx]
+    indent.pop(idx)
+    lines.pop(idx)
+    orig_lines.pop(idx)
+
+    follow_indent = base_indent + indent_size
+    new_indents = [base_indent] + [follow_indent] * (len(split_lines) - 1)
+
+    for new_line, new_indent in reversed(list(zip(split_lines, new_indents))):
+        lines.insert(idx, new_line)
+        indent.insert(idx, new_indent)
+        orig_lines.insert(idx, new_line)
+
+
 def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, indent_size, llength, use_same_line, is_omp_conditional, label, filename, line_nr, allow_split):
     """Write reformatted line to file"""
 
@@ -1994,16 +2010,7 @@ def write_formatted_line(outfile, indent, lines, orig_lines, indent_special, ind
         if allow_split and ind_use + line_length >= (llength + 1):
             split_lines = _auto_split_line(line, ind_use, llength, indent_size)
             if split_lines:
-                base_indent = indent[idx]
-                indent.pop(idx)
-                lines.pop(idx)
-                orig_lines.pop(idx)
-                follow_indent = base_indent + indent_size
-                new_indents = [base_indent] + [follow_indent] * (len(split_lines) - 1)
-                for new_line, new_indent in reversed(list(zip(split_lines, new_indents))):
-                    lines.insert(idx, new_line)
-                    indent.insert(idx, new_indent)
-                    orig_lines.insert(idx, new_line)
+                _insert_split_chunks(idx, split_lines, indent, indent_size, lines, orig_lines)
                 continue
 
         if ind_use + line_length <= (llength+1):  # llength (default 132) plus 1 newline char
