@@ -327,6 +327,33 @@ class FPrettifyTestCase(unittest.TestCase):
 
         self.assert_fprettify_result(['-i', '4', '-l', '72'], instring, outstring_exp)
 
+    def test_auto_split_after_indent_adjustment(self):
+        """splitting must also run during the indentation pass to stay idempotent"""
+        instring = (
+            "program demo\n"
+            "    integer :: i\n"
+            "    if (.true.) then\n"
+            "        if (.true.) then\n"
+            "  if (i > 1 .and. this_is_a_pretty_freaking_long_parameter_name .eq. 42) print *, \"too long\"\n"
+            "        end if\n"
+            "    end if\n"
+            "end program demo\n"
+        )
+
+        outstring_exp = (
+            "program demo\n"
+            "    integer :: i\n"
+            "    if (.true.) then\n"
+            "        if (.true.) then\n"
+            "            if (i > 1 .and. this_is_a_pretty_freaking_long_parameter_name .eq. 42) print &\n"
+            "                *, \"too long\"\n"
+            "        end if\n"
+            "    end if\n"
+            "end program demo\n"
+        )
+
+        self.assert_fprettify_result(['-i', '4', '-l', '100'], instring, outstring_exp)
+
 
     def test_comments(self):
         """test options related to comments"""

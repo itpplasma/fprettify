@@ -1608,9 +1608,10 @@ def reformat_ffile_combined(infile, outfile, impose_indent=True, indent_size=3, 
             if indent[0] < len(label):
                 indent = [ind + len(label) - indent[0] for ind in indent]
 
+        allow_auto_split = auto_format and (impose_whitespace or impose_indent)
         write_formatted_line(outfile, indent, lines, orig_lines, indent_special, indent_size, llength,
                              use_same_line, is_omp_conditional, label, orig_filename, stream.line_nr,
-                             allow_split=impose_whitespace and auto_format)
+                             allow_split=allow_auto_split)
 
         do_indent, use_same_line = pass_defaults_to_next_line(f_line)
 
