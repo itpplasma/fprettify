@@ -354,6 +354,32 @@ class FPrettifyTestCase(unittest.TestCase):
 
         self.assert_fprettify_result(['-i', '4', '-l', '100'], instring, outstring_exp)
 
+    def test_auto_split_when_whitespace_disabled(self):
+        """indent-only runs must still split long logical lines"""
+        instring = (
+            "program demo\n"
+            "    if (.true.) then\n"
+            "      if (.true.) then\n"
+            "  if (i > 1 .and. identifier_that_is_far_too_long .eq. 42) print *, \"oops\"\n"
+            "      end if\n"
+            "    end if\n"
+            "end program demo\n"
+        )
+
+        outstring_exp = (
+            "program demo\n"
+            "    if (.true.) then\n"
+            "        if (.true.) then\n"
+            "            if (i > 1 .and. &\n"
+            "                identifier_that_is_far_too_long .eq. 42) &\n"
+            "                print *, \"oops\"\n"
+            "        end if\n"
+            "    end if\n"
+            "end program demo\n"
+        )
+
+        self.assert_fprettify_result(['-i', '4', '-l', '70', '--disable-whitespace'], instring, outstring_exp)
+
 
     def test_comments(self):
         """test options related to comments"""
